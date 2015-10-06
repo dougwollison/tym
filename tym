@@ -5,9 +5,6 @@
 # The directory to backup to
 $BASEDIR="~/Archives"
 
-# The user@hostname connection to use
-CONNECT="tym@$1.tym"
-
 # === Usage Checking === #
 
 if [ -z "$1" ]; then
@@ -31,6 +28,9 @@ FILTER="rsync-filter.txt"
 
 # The base directory
 BASE=$(cat "$BACKUP/rsync-base.txt");
+
+# The user@hostname connection to use
+CONNECT="tym@$1.tym"
 
 # === Begin Script === #
 
