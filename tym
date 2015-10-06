@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# === Configuration === #
+
+# The directory to backup to
+$BASEDIR="~/Archives"
+
+# The user@hostname connection to use
+CONNECT="tym@$1.tym"
+
+# === Usage Checking === #
+
+if [ -z "$1" ]; then
+	echo "Usage: tym SERVER [test]"
+	exit
+fi
+
+# === Variable Setup === #
+
+# The directory to backup to
+BACKUP="$BASEDIR/$1"
+
+# The timestamp of the backup
+DATE=`date "+%Y.%m.%d_%H.%M.%S"`
+
+# The basename of the inprogress file
+INPROG="rsync-inprogress.txt"
+
+# The basename of the filter rules file
+FILTER="rsync-filter.txt"
+
+# The base directory
+BASE=$(cat "$BACKUP/rsync-base.txt");
+
+# === Begin Script === #
+
+mkdir -p $BACKUP
+cd $BACKUP
+
+# Replace DATE if inprogress file exists
+if [ -e $INPROG ]; then
+	DATE=$(cat $INPROG);
+fi
+
+# Store the date in the inprogress file
+echo $DATE > $INPROG;
+
+# Make sure the filter file exists
+touch "$BACKUP/rsync-filter.txt"
+
+if [ ! -e "$BACKUP" ]; then
+	echo "Can't find backup directory"
+	exit
+fi
+
+# Do a dry run if requested
+if [[ $2 == "test" ]]; then
+	rsync --dry-run -vvhrtplHP -e "ssh" --rsync-path="sudo rsync" --filter=". $FILTER" $CONNECT:$BASE $BACKUP/initial/
+	exit
+fi
+
+if [ ! -e "$BACKUP/initial/" ]; then
+	# Run the initial backup
+	echo "Making initial backup..."
+	mkdir -p $BACKUP/initial/
+	rsync -vvhrtplHP -e "ssh" --rsync-path="sudo rsync" --filter=". $FILTER" --log-file="$BACKUP/log" $CONNECT:$BASE $BACKUP/initial/
+
+	# Create the current link
+	rm -f current
+	ln -s initial current
+else
+	# Run an incremental backup
+	echo "Starting backup for $DATE..."
+	mkdir -p $BACKUP/$DATE/
+	rsync -vvhrtplHP -e "ssh" --rsync-path="sudo rsync" --filter=". $FILTER" --delete --delete-excluded --log-file="$BACKUP/log" --link-dest="$BACKUP/current/" $CONNECT:$BASE $BACKUP/$DATE/
+
+	# Update the current link
+	rm -f current
+	ln -s $DATE current
+
+	# Delete inprogress file
+	rm -f $INPROG
+fi
